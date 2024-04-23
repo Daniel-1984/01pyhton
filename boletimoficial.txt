@@ -1,0 +1,85 @@
+!pip install pytesseract
+!apt install tesseract-ocr
+!pip install pytesseract
+
+
+import pandas as pd
+import pytesseract
+from PIL import Image
+import ipywidgets as widgets
+from io import BytesIO
+
+# Função para extrair dados de imagem
+def extrair_dados_de_imagem(imagem):
+    # Abrir a imagem usando PIL a partir de bytes
+    img = Image.open(BytesIO(imagem))
+    # Usar pytesseract para converter a imagem em texto
+    texto_extraido = pytesseract.image_to_string(img)
+
+    # Dividir os dados extraídos em linhas e limpar espaços em branco
+    linhas = texto_extraido.strip().split("\n")
+
+    # Suponha que a primeira linha contém os cabeçalhos e a segunda os valores
+    if len(linhas) > 1:
+        cabecalhos = linhas[0].split()
+        valores = [float(valor.replace(',', '.')) for valor in linhas[1].split()]
+        return pd.DataFrame([valores], columns=cabecalhos)
+    else:
+        raise ValueError("Dados insuficientes para criar DataFrame")
+
+# Função para calcular o índice de Wobbe
+def calcular_indice_wobbe(gashv, densidade_relativa):
+    return gashv / (densidade_relativa ** 0.5)
+
+# Widgets para entrada de dados
+densidade_widget = widgets.FloatText(
+    value=0.0,
+    description='Densidade Relativa (ρ):',
+    disabled=False
+)
+
+oxigenio_widget = widgets.FloatText(
+    value=0.0,
+    description='Oxigênio:',
+    disabled=False
+)
+
+button = widgets.Button(description="Calcular Índice de Wobbe")
+
+# Criar um widget de upload para que o usuário possa carregar uma imagem
+upload_widget = widgets.FileUpload(
+    accept='image/*',  # Aceitar apenas imagens
+    multiple=False  # Permitir apenas um arquivo por vez
+)
+
+def calculate_wobbe_on_click(b):
+    if upload_widget.value:
+        # Extrair a imagem do upload
+        uploaded_file = next(iter(upload_widget.value.values()))
+        imagem = uploaded_file['content']
+        
+        try:
+            df = extrair_dados_de_imagem(imagem)
+            densidade_relativa = densidade_widget.value
+            oxige = oxigenio_widget.value
+            indice_wobbe = calcular_indice_wobbe(df['GASHV'][0], densidade_relativa)
+
+            # Exibir os resultados formatados
+            print("Poder Calorífico Superior / GASHV (PCS):", df['GASHV'][0])
+            print("Densidade Relativa/ SPGR (ρ):", densidade_relativa)
+            print("Metano (%mol):", df['METHAN'][0])
+            print("Etano (%mol):", df['ETHANE'][0])
+            print("Propano (%mol):", df['PROPAN'][0])
+            print("N-Hexano (%mol):", df['NHEXAN'][0])
+            print("N-Pentano (%mol):", df['NPENTA'][0])
+            print("I-Pentano (%mol):", df['IPENTA'][0])
+            print("I-Butano (%mol):", df['IBUTAN'][0])
+            print("N-Butano (%mol):", df['NBUTAN'][0])
+            print("O Índice de Wobbe calculado é:", indice_wobbe)
+            print("Oxigênio:", oxige)
+        except Exception as e:
+            print("Erro ao processar a imagem:", e)
+
+button.on_click(calculate_wobbe_on_click)
+
+display(upload_widget, densidade_widget, oxigenio_widget, button)
